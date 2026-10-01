@@ -114,18 +114,32 @@
       </div>
     </div>
 
-    <!-- AUTH MODAL (USERNAME & PASSWORD ONLY) -->
+    <!-- AUTH MODAL WITH DIRECT TABS -->
     <div id="auth-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div class="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
+        
+        <!-- Tab Selector: Log In vs Sign Up -->
+        <div class="flex rounded-lg bg-zinc-950 p-1 border border-zinc-800">
+          <button type="button" onclick="setAuthMode('signin')" id="tab-btn-signin" 
+                  class="flex-1 py-1.5 text-xs font-semibold rounded-md bg-zinc-800 text-white transition">
+            Sign In
+          </button>
+          <button type="button" onclick="setAuthMode('signup')" id="tab-btn-signup" 
+                  class="flex-1 py-1.5 text-xs font-semibold rounded-md text-zinc-400 hover:text-white transition">
+            Create Account
+          </button>
+        </div>
+
         <div>
-          <h2 id="auth-heading" class="text-lg font-bold text-white">Sign In</h2>
-          <p id="auth-subheading" class="text-xs text-zinc-400">Enter your username and password</p>
+          <h2 id="auth-heading" class="text-base font-bold text-white">Sign In</h2>
+          <p id="auth-subheading" class="text-xs text-zinc-400">Enter your credentials to enter pocket hub</p>
         </div>
 
         <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-3">
           <div>
             <label class="block text-[11px] text-zinc-400 mb-1">Username</label>
-            <input id="auth-username" type="text" required placeholder="Choose a username" pattern="^[a-zA-Z0-9_]{3,20}$"
+            <input id="auth-username" type="text" required placeholder="Pick a username" 
+                   pattern="^[a-zA-Z0-9_]{3,20}$"
                    title="3 to 20 letters, numbers, or underscores"
                    class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500" />
             <p class="text-[10px] text-zinc-500 mt-1">Letters, numbers, and underscores only</p>
@@ -135,37 +149,33 @@
             <label class="block text-[11px] text-zinc-400 mb-1">Password</label>
             <input id="auth-password" type="password" required placeholder="••••••••" minlength="6"
                    class="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500" />
+            <p class="text-[10px] text-zinc-500 mt-1">At least 6 characters</p>
           </div>
 
-          <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20"></div>
+          <div id="auth-error" class="hidden text-xs text-rose-400 bg-rose-500/10 p-2.5 rounded border border-rose-500/20 leading-tight"></div>
+          <div id="auth-success" class="hidden text-xs text-emerald-400 bg-emerald-500/10 p-2.5 rounded border border-emerald-500/20 leading-tight"></div>
 
           <button id="auth-submit-btn" type="submit" 
-                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg text-xs transition">
+                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-xs transition shadow-lg shadow-indigo-600/20">
             Sign In
           </button>
         </form>
 
-        <div class="text-center pt-2 border-t border-zinc-800">
-          <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs text-zinc-400 hover:text-white">
-            Need an account? <span class="text-indigo-400">Create one</span>
-          </button>
-        </div>
       </div>
     </div>
 
   </div>
 
   <script>
-    // --- 1. SUPABASE CONFIGURATION ---
-    const SUPABASE_URL = 'sb_secret_BSUx9x3CaD6ghTVPyB8VVA_NXkpxXA5';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsaHZtY3R5Z2pmbW55cHRsdGprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDg2ODAzNiwiZXhwIjoyMTA2NDQ0MDM2fQ.ZO-4RSiDeIFSkM4-wBzIIBzj657DbwnnUueNBiLplpM';
+    // --- 1. SUPABASE CLIENT ---
+    const SUPABASE_URL = 'https://xlhvmctygjfmnyptltjk.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_UXTUxRNqqg2t_Z-gl5Xezg_ov3Uqer-';
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let isSignUpMode = false;
+    let authMode = 'signin'; // 'signin' or 'signup'
     let currentUser = null;
 
-    // Helper: Turn username into an internal unique auth identifier
     function usernameToInternal(rawUsername) {
       const clean = rawUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
       return `${clean}@hub.internal`;
@@ -198,27 +208,32 @@
       }
     }
 
-    // --- 2. AUTHENTICATION ---
-    function toggleAuthMode() {
-      isSignUpMode = !isSignUpMode;
+    // --- 2. AUTH SWITCHER & SUBMIT ---
+    function setAuthMode(mode) {
+      authMode = mode;
+      const tabSignIn = document.getElementById('tab-btn-signin');
+      const tabSignUp = document.getElementById('tab-btn-signup');
       const heading = document.getElementById('auth-heading');
       const subheading = document.getElementById('auth-subheading');
       const submitBtn = document.getElementById('auth-submit-btn');
-      const toggleBtn = document.getElementById('auth-toggle-btn');
       const errBox = document.getElementById('auth-error');
+      const successBox = document.getElementById('auth-success');
 
       errBox.classList.add('hidden');
+      successBox.classList.add('hidden');
 
-      if (isSignUpMode) {
-        heading.textContent = 'Create Account';
-        subheading.textContent = 'Pick a username and set your password';
+      if (mode === 'signup') {
+        tabSignUp.className = "flex-1 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 text-white transition";
+        tabSignIn.className = "flex-1 py-1.5 text-xs font-semibold rounded-md text-zinc-400 hover:text-white transition";
+        heading.textContent = 'Create New Account';
+        subheading.textContent = 'Choose your username and password';
         submitBtn.textContent = 'Create Account';
-        toggleBtn.innerHTML = 'Already have an account? <span class="text-indigo-400">Sign In</span>';
       } else {
+        tabSignIn.className = "flex-1 py-1.5 text-xs font-semibold rounded-md bg-zinc-800 text-white transition";
+        tabSignUp.className = "flex-1 py-1.5 text-xs font-semibold rounded-md text-zinc-400 hover:text-white transition";
         heading.textContent = 'Sign In';
         subheading.textContent = 'Enter your username and password';
         submitBtn.textContent = 'Sign In';
-        toggleBtn.innerHTML = 'Need an account? <span class="text-indigo-400">Create one</span>';
       }
     }
 
@@ -227,12 +242,19 @@
       const rawUsername = document.getElementById('auth-username').value.trim();
       const password = document.getElementById('auth-password').value;
       const errBox = document.getElementById('auth-error');
+      const successBox = document.getElementById('auth-success');
+      const submitBtn = document.getElementById('auth-submit-btn');
+
       errBox.classList.add('hidden');
+      successBox.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.textContent = authMode === 'signup' ? 'Creating account...' : 'Signing in...';
 
       const internalEmail = usernameToInternal(rawUsername);
 
       try {
-        if (isSignUpMode) {
+        if (authMode === 'signup') {
+          // 1. Trigger Supabase Sign Up
           const { data, error } = await supabase.auth.signUp({
             email: internalEmail,
             password: password,
@@ -240,20 +262,38 @@
               data: { username: rawUsername }
             }
           });
+
           if (error) {
-            if (error.message.includes('User already registered')) {
-              throw new Error('That username is already taken. Try another.');
+            if (error.message.toLowerCase().includes('already registered')) {
+              throw new Error('Username already taken. Please choose another.');
             }
             throw error;
           }
+
+          // If session wasn't auto-created, sign them in directly
+          if (!data.session) {
+            const loginRes = await supabase.auth.signInWithPassword({
+              email: internalEmail,
+              password: password
+            });
+            if (loginRes.error) {
+              throw new Error("Account registered! Please turn off 'Confirm email' in Supabase Dashboard (Auth > Providers > Email).");
+            }
+          }
+
+          successBox.textContent = 'Account created successfully! Logging you in...';
+          successBox.classList.remove('hidden');
+
         } else {
+          // 2. Trigger Supabase Sign In
           const { data, error } = await supabase.auth.signInWithPassword({
             email: internalEmail,
             password: password
           });
+
           if (error) {
-            if (error.message.includes('Invalid login credentials')) {
-              throw new Error('Incorrect username or password.');
+            if (error.message.toLowerCase().includes('invalid login credentials')) {
+              throw new Error('Incorrect username or password. If you are new, click "Create Account" above.');
             }
             throw error;
           }
@@ -261,6 +301,9 @@
       } catch (err) {
         errBox.textContent = err.message;
         errBox.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = authMode === 'signup' ? 'Create Account' : 'Sign In';
       }
     }
 
